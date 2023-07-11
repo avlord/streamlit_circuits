@@ -6,26 +6,27 @@ import numpy as np
 import os
 
 
-def load_model(path):
+def load_model(path,circuit_name):
     """Load model"""
-    path_to_model = os.path.join(path, "model.joblib")
+    circuit_name = circuit_name.lower()
+    path_to_model = os.path.join(path, f"{circuit_name}.joblib")
     model = joblib.load(path_to_model)
-    scaler = joblib.load(os.path.join(path, "scaler.joblib"))
+    scaler = joblib.load(os.path.join(path, f"scaler_{circuit_name}.joblib"))
     return model, scaler
 
-def setup_model(vals):
+def setup_model(vals,circuit_name,perf_req,num_params):
     print(vals)
+    print(circuit_name)
+    vals = [vals[key]  for key in  perf_req]
 
-    bw = vals["bw"]
-    pw = vals["pw"]
-    gain = vals["a0"]
-    model, scaler = load_model("models_trained")
-    vals = np.array([bw, pw, gain]).reshape(1,3)
-    perf = np.hstack([np.array([0,0,0]).reshape(1,3),vals])
+    model, scaler = load_model("models_trained",circuit_name)
+    vals = np.array(vals).reshape(1,len(perf_req))
+    perf = np.hstack([np.array([0]*num_params).reshape(1,num_params),vals])
+    print(perf.shape,vals.shape)
     # perf = np.array([3.17e9,3.81e-04,22]).reshape(1,3)
     # perf = np.hstack([np.array([0,0,0]).reshape(1,3),perf])
 
-    perf = scaler.transform(perf)[:,3:]
+    perf = scaler.transform(perf)[:,num_params:]
 
     # print('perf after', perf)
 
@@ -37,9 +38,9 @@ def setup_model(vals):
 
     inverse_trans = scaler.inverse_transform(data)
     #params, perf
-    print(inverse_trans[:,0:3],inverse_trans[:,3:6])
-    print([str(x) for x in inverse_trans[:,0:3]])
-    return [str(x) for x in inverse_trans[:,0:3]]
+    # print(inverse_trans[:,0:3],inverse_trans[:,3:6])
+    # print([str(x) for x in inverse_trans[:,0:3]])
+    return [str(x) for x in inverse_trans[:,0:num_params]]
     #bandwidth, power, gain
 #     [2.175997e+09 3.816326e-04 2.094111e+01]
 # [8.501272e+09 5.610970e-04 2.823009e+01]
@@ -48,31 +49,37 @@ def setup_model(vals):
 
 circuit = st.radio(
     "Select a circuit for simulation",
-    ('Cascode', 'LNA', 'Mixer', 'Common Source Amplifier', 'PA', 'Two Stage', 'VCO'))
+    ('Cascode', 'LNA', 'Mixer', 'CS', 'PA', 'Two_Stage', 'VCO'))
 
 
 if circuit == 'Cascode':
     image = Image.open('images/cascode.png')
     perf_req = ['bw', 'pw', 'a0']
+    num_params = 3
 if circuit == 'LNA':
     image = Image.open('images/lna.png')
     perf_req = ['Gt', 'S11', 'Nf']
+    num_params = 4
 if circuit == 'Mixer':
     image = Image.open('images/mixer.png')
     perf_req = ['PowerConsumption', 'Swing', 'Conversion_Gain']
-if circuit == 'Common Source Amplifier':
+    num_params = 4
+if circuit == 'CS':
     image = Image.open('images/nmos.png')
     perf_req = ['bw', 'pw', 'a0']
+    num_params =  2
 if circuit == 'PA':
     image = Image.open('images/pa.png')
     perf_req = ['gain1', 'PAE1', 'DE1']
-if circuit == 'Two Stage':
+    num_params = 4
+if circuit == 'Two_Stage':
     image = Image.open('images/2st.png')
     perf_req = ['bw', 'pw', 'a0']
+    num_params = 3
 if circuit == 'VCO':
     image = Image.open('images/vco.png')
     perf_req = ['power_consumption', 'out_power', 'tuningrange']
-
+    num_params = 4
 st.image(image, caption='Circuit Scheme')
 
 st.markdown('Please, type performance requirements for the circuit. In the following format: bw=3.17e9, pw=3.81e-04, a0=22')
@@ -83,4 +90,4 @@ for req in perf_req:
 
 if st.button('Simulate'):
     st.write('Simulating...')
-    st.write(setup_model(input_values))
+    st.write(setup_model(input_values, circuit, perf_req,num_params))
